@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 
 	_ "github.com/lib/pq"
 )
@@ -12,7 +11,7 @@ type Storage interface {
 	GetAccounts() ([]*Account, error)
 	CreateAccount(*Account) error
 	DeleteAccount(int) error
-	UpdateAccount(*Account) error
+	Transfer(int, int, int) error
 }
 
 type PostgresStore struct {
@@ -58,30 +57,88 @@ func (s *PostgresStore) CreateAccount(account *Account) error {
 	query := `INSERT INTO account (first_name, last_name, number, balance, created_at)
   VALUES ($1, $2, $3, $4, $5)`
 
-	res, err := s.db.Query(query, account.FirstName, account.LastName, account.Number, account.Balance, account.CreatedAt)
+	_, err := s.db.Exec(query, account.FirstName, account.LastName, account.Number, account.Balance, account.CreatedAt)
 
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("%+v\n", res)
 	return nil
 }
 
-func (s *PostgresStore) UpdateAccount(*Account) error {
+func (s *PostgresStore) addFundsToAccountID(tx *sql.Tx, id int, amount int) error {
+	query := `
+    UPDATE account
+    SET balance = balance + $1
+    WHERE id = $2
+  `
+
+	_, err := tx.Exec(query, amount, id)
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func (s *PostgresStore) Transfer(from int, to int, amount int) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		} else {
+			err = tx.Commit()
+		}
+	}()
+
+	err = s.addFundsToAccountID(tx, from, -amount)
+	if err != nil {
+		return err
+	}
+	err = s.addFundsToAccountID(tx, to, amount)
+	if err != nil {
+		return err
+	}
+
+	return err
 }
 
 func (s *PostgresStore) DeleteAccount(id int) error {
+	query := `DELETE FROM account WHERE ID = $1`
+
+	_, err := s.db.Exec(query, id)
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (s *PostgresStore) GetAccountByID(id int) (*Account, error) {
-	return nil, nil
+	query := `SELECT id, first_name, last_name, number, balance, created_at FROM account WHERE ID = $1`
+
+	row := s.db.QueryRow(query, id)
+
+	account := &Account{}
+	err := row.Scan(&account.ID, &account.FirstName, &account.LastName, &account.Number, &account.Balance, &account.CreatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return account, nil
 }
 
 func (s *PostgresStore) GetAccounts() ([]*Account, error) {
-	query := `SELECT * FROM account`
+	query := `SELECT id, first_name, last_name, number, balance, created_at FROM account`
 	res, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -90,13 +147,7 @@ func (s *PostgresStore) GetAccounts() ([]*Account, error) {
 	accounts := []*Account{}
 	for res.Next() {
 		account := &Account{}
-		err := res.Scan(
-			&account.ID,
-			&account.FirstName,
-			&account.LastName,
-			&account.Number,
-			&account.Balance,
-			&account.CreatedAt)
+		err := res.Scan(&account.ID, &account.FirstName, &account.LastName, &account.Number, &account.Balance, &account.CreatedAt)
 
 		if err != nil {
 			return nil, err
