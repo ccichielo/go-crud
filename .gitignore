@@ -1,0 +1,42 @@
+# Binaries
+/bin/
+/build/
+/dist/
+
+# Dependency directories (Remove the comment if you are using Go modules)
+# vendor/
+
+# Compiled object files
+*.o
+*.a
+
+# Test binary, build with `go test -c`
+*.test
+
+# Go workspace file
+*.workspace
+
+# IDE/Editor specific files
+*.idea/
+*.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Log files
+*.log
+
+# GoLand files
+.idea/
+
+# Go binaries
+*.exe
+*.out
+*.so
+*.dylib
+*.a
+*.obj
+*.lib
+
+# Miscellaneous
+*.swp
+*.swo
