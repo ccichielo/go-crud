@@ -2,10 +2,12 @@ package main
 
 import (
 	"log"
+
+	"github.com/ccichielo/gobank/pkg"
 )
 
 func main() {
-	store, err := NewPostgresStore()
+	store, err := pkg.NewPostgresStore()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -14,6 +16,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	server := NewAPIServer(":3000", store)
+	server := pkg.NewAPIServer(":3000", store)
 	server.Run()
 }
